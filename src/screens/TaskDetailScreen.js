@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,19 +10,128 @@ import {
   StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation, useRoute, useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AttachmentPreview from '../components/AttachmentPreview';
 import { useTheme } from '../context/ThemeContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const TaskDetailScreen = ({ route, navigation }) => {
-  const { task } = route.params;
-  const [currentTask, setCurrentTask] = useState(task);
+const TaskDetailScreen = () => {
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { task: routeTask, taskId } = route.params;
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
+  const [task, setTask] = useState(routeTask);
+  const [loading, setLoading] = useState(!routeTask && !!taskId);
 
-  const getPriorityColor = (priority) => {
-    switch (priority) {
+  useEffect(() => {
+    if (taskId && !routeTask) {
+      loadTaskById(taskId);
+    }
+  }, [taskId, routeTask]);
+
+  // Sayfa odaklandığında görevi yeniden yükle
+  useEffect(() => {
+    if (isFocused && task) {
+      loadTaskById(task.id);
+    }
+  }, [isFocused]);
+
+  const loadTaskById = async (id) => {
+    try {
+      const storedTasks = await AsyncStorage.getItem('tasks');
+      if (storedTasks) {
+        const parsedTasks = JSON.parse(storedTasks);
+        const foundTask = parsedTasks.find(t => t.id === id);
+        if (foundTask) {
+          setTask(foundTask);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading task:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const confirmComplete = () => {
+    Alert.alert(
+      'Görevi Tamamla',
+      `"${task.title}" görevini tamamladınız mı?`,
+      [
+        { text: 'İptal', style: 'cancel' },
+        { text: 'Tamamla', onPress: handleComplete },
+      ]
+    );
+  };
+
+  const handleComplete = async () => {
+    try {
+      const storedTasks = await AsyncStorage.getItem('tasks');
+      if (storedTasks) {
+        const parsedTasks = JSON.parse(storedTasks);
+        const updatedTasks = parsedTasks.map(t => 
+          t.id === task.id ? { ...t, completed: true, completedAt: new Date().toISOString() } : t
+        );
+        await AsyncStorage.setItem('tasks', JSON.stringify(updatedTasks));
+        Alert.alert('Başarılı', 'Görev tamamlandı!', [
+          { text: 'Tamam', onPress: () => navigation.goBack() }
+        ]);
+      }
+    } catch (error) {
+      console.error('Error completing task:', error);
+      Alert.alert('Hata', 'Görev tamamlanırken bir hata oluştu');
+    }
+  };
+  
+  const handleDelete = () => {
+    Alert.alert(
+      "Görevi Sil",
+      `"${task.title}" görevini kalıcı olarak silmek istediğinizden emin misiniz?`,
+      [
+        { text: "İptal", style: "cancel" },
+        {
+          text: "Sil",
+          onPress: async () => {
+            try {
+              const storedTasks = await AsyncStorage.getItem('tasks');
+              if (storedTasks) {
+                const parsedTasks = JSON.parse(storedTasks);
+                const filteredTasks = parsedTasks.filter(t => t.id !== task.id);
+                await AsyncStorage.setItem('tasks', JSON.stringify(filteredTasks));
+                navigation.goBack();
+              }
+            } catch (error) {
+              console.error('Error deleting task:', error);
+              Alert.alert('Hata', 'Görev silinirken bir hata oluştu');
+            }
+          },
+          style: "destructive",
+        },
+      ]
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: theme.text }}>Görev yükleniyor...</Text>
+      </View>
+    );
+  }
+
+  if (!task) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: theme.text }}>Görev bulunamadı</Text>
+      </View>
+    );
+  }
+
+  const getPriorityColor = (category) => {
+    switch (category) {
       case 'Urgent':
         return '#FF3B30';
       case 'Important':
@@ -36,8 +145,8 @@ const TaskDetailScreen = ({ route, navigation }) => {
     }
   };
 
-  const getPriorityText = (priority) => {
-    switch (priority) {
+  const getPriorityText = (category) => {
+    switch (category) {
       case 'Urgent':
         return 'Acil';
       case 'Important':
@@ -74,66 +183,6 @@ const TaskDetailScreen = ({ route, navigation }) => {
     return `${dateText}, ${timeText}`;
   };
 
-  const markAsCompleted = async () => {
-    try {
-      const storedTasks = await AsyncStorage.getItem('tasks');
-      if (storedTasks) {
-        const tasks = JSON.parse(storedTasks);
-        const updatedTasks = tasks.map(t => 
-          t.id === currentTask.id 
-            ? { ...t, completed: true, completedAt: new Date().toISOString() }
-            : t
-        );
-        await AsyncStorage.setItem('tasks', JSON.stringify(updatedTasks));
-        
-        Alert.alert('Başarılı', 'Görev tamamlandı!', [
-          { text: 'Tamam', onPress: () => navigation.goBack() }
-        ]);
-      }
-    } catch (error) {
-      Alert.alert('Hata', 'Görev tamamlanırken bir hata oluştu');
-    }
-  };
-
-  const deleteTask = async () => {
-    try {
-      const storedTasks = await AsyncStorage.getItem('tasks');
-      if (storedTasks) {
-        const tasks = JSON.parse(storedTasks);
-        const updatedTasks = tasks.filter(t => t.id !== currentTask.id);
-        await AsyncStorage.setItem('tasks', JSON.stringify(updatedTasks));
-        
-        Alert.alert('Başarılı', 'Görev silindi!', [
-          { text: 'Tamam', onPress: () => navigation.goBack() }
-        ]);
-      }
-    } catch (error) {
-      Alert.alert('Hata', 'Görev silinirken bir hata oluştu');
-    }
-  };
-
-  const confirmDelete = () => {
-    Alert.alert(
-      'Görevi Sil',
-      'Bu görevi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.',
-      [
-        { text: 'İptal', style: 'cancel' },
-        { text: 'Sil', style: 'destructive', onPress: deleteTask },
-      ]
-    );
-  };
-
-  const confirmComplete = () => {
-    Alert.alert(
-      'Görevi Tamamla',
-      `"${currentTask.title}" görevini tamamladınız mı?`,
-      [
-        { text: 'İptal', style: 'cancel' },
-        { text: 'Tamamla', onPress: markAsCompleted },
-      ]
-    );
-  };
-
   const openAttachment = async (attachment) => {
     if (attachment.type === 'image') {
       // Fotoğraf önizleme için ayrı modal açabiliriz
@@ -153,13 +202,13 @@ const TaskDetailScreen = ({ route, navigation }) => {
   };
 
   const isOverdue = () => {
-    const deadline = new Date(currentTask.deadline);
+    const deadline = new Date(task.deadline);
     const now = new Date();
-    return deadline < now;
+    return deadline < now && !task.completed;
   };
 
   const getTimeRemaining = () => {
-    const deadline = new Date(currentTask.deadline);
+    const deadline = new Date(task.deadline);
     const now = new Date();
     const diffTime = deadline - now;
     
@@ -195,10 +244,10 @@ const TaskDetailScreen = ({ route, navigation }) => {
           backgroundColor: theme.background,
           borderBottomColor: theme.border 
         }]}>
-        <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(currentTask.category) }]}>
-          <Text style={styles.priorityText}>{getPriorityText(currentTask.category)}</Text>
-        </View>
-        
+          <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(task.category) }]}>
+            <Text style={styles.priorityText}>{getPriorityText(task.category)}</Text>
+          </View>
+          
           <View style={[
             styles.timeRemaining, 
             { backgroundColor: isOverdue() ? theme.danger + '20' : theme.primary + '20' }
@@ -207,84 +256,69 @@ const TaskDetailScreen = ({ route, navigation }) => {
               styles.timeText, 
               { color: isOverdue() ? theme.danger : theme.primary }
             ]}>
-            {getTimeRemaining()}
-          </Text>
+              {getTimeRemaining()}
+            </Text>
+          </View>
         </View>
-      </View>
 
-      <View style={styles.content}>
-          <Text style={[styles.title, { color: theme.text }]}>{currentTask.title}</Text>
-        
-        <View style={styles.section}>
+                <View style={styles.content}>
+          <Text style={[styles.title, { color: theme.text }]}>{task.title}</Text>
+          
+          <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>Açıklama</Text>
-            <Text style={[styles.description, { color: theme.textSecondary }]}>{currentTask.description}</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Son Tarih</Text>
-          <View style={[styles.dateContainer, { 
-            backgroundColor: theme.surface,
-            borderColor: theme.border 
-          }]}>
-            <Ionicons name="calendar-outline" size={20} color={theme.primary} />
-            <Text style={[styles.dateText, { color: theme.text }]}>
-              {formatDateTime(currentTask.deadline)}
+            <Text style={[styles.description, { color: theme.textSecondary }]}>
+              {task.description || 'Açıklama eklenmemiş'}
             </Text>
           </View>
-        </View>
 
-        <AttachmentPreview 
-          attachments={currentTask.attachments}
-          onRemove={() => {}} // Read-only mode
-          editable={false}
-        />
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Görev Bilgileri</Text>
-          <View style={[styles.infoRow, { borderBottomColor: theme.border }]}>
-            <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Oluşturma Tarihi:</Text>
-            <Text style={[styles.infoValue, { color: theme.text }]}>
-              {new Date(currentTask.createdAt).toLocaleDateString('tr-TR')}
-            </Text>
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Son Tarih</Text>
+            <View style={styles.deadlineContainer}>
+              <Ionicons name="calendar-outline" size={20} color="#007AFF" />
+              <Text style={[styles.deadline, { color: theme.textSecondary }]}>
+                {formatDateTime(task.deadline)}
+              </Text>
+            </View>
           </View>
-          <View style={[styles.infoRow, { borderBottomColor: theme.border }]}>
-            <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Durum:</Text>
-            <Text style={[styles.infoValue, { color: currentTask.completed ? theme.success : theme.primary }]}>
-              {currentTask.completed ? 'Tamamlandı' : 'Devam Ediyor'}
-            </Text>
+
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Görev Bilgileri</Text>
+            <View style={styles.infoSection}>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Oluşturma Tarihi:</Text>
+                <Text style={styles.infoValue}>
+                  {task.createdAt ? new Date(task.createdAt).toLocaleDateString('tr-TR') : '01.07.2025'}
+                </Text>
+              </View>
+              <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
+                <Text style={styles.infoLabel}>Durum:</Text>
+                <Text style={styles.infoValue}>Devam Ediyor</Text>
+              </View>
+            </View>
+          </View>
+
         </View>
-      </View>
+      </ScrollView>
 
-          {/* Action Buttons - ScrollView içinde */}
-      <View style={styles.actionButtons}>
-        <TouchableOpacity
-              style={[styles.actionButton, styles.editButton, { 
-                backgroundColor: theme.surface,
-                borderColor: theme.primary 
-              }]}
-              onPress={() => navigation.navigate('EditTask', { task: currentTask })}
-        >
-              <Ionicons name="create-outline" size={20} color={theme.primary} />
-              <Text style={[styles.editButtonText, { color: theme.primary, marginLeft: 8 }]}>Düzenle</Text>
-        </TouchableOpacity>
+      {!task.completed && (
+        <View style={[styles.footer, { backgroundColor: theme.background, borderTopColor: theme.border, paddingBottom: insets.top + 10 }]}>
+          <TouchableOpacity style={[styles.button, styles.editButton, {backgroundColor: theme.primary + '20'}]} onPress={() => navigation.navigate('EditTask', { task })}>
+            <Ionicons name="pencil-outline" size={20} color={theme.primary} />
+            <Text style={[styles.buttonText, { color: theme.primary }]}>Düzenle</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.button, styles.completeButton]} onPress={confirmComplete}>
+            <Ionicons name="checkmark-done-outline" size={20} color={'#fff'} />
+            <Text style={[styles.buttonText, { color: '#fff' }]}>Tamamla</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
-        <TouchableOpacity
-              style={[styles.actionButton, styles.completeButton, { backgroundColor: theme.primary }]}
-          onPress={confirmComplete}
-        >
-          <Ionicons name="checkmark-circle-outline" size={20} color="white" />
-              <Text style={[styles.completeButtonText, { marginLeft: 8 }]}>Tamamla</Text>
-        </TouchableOpacity>
-      </View>
-
-          <TouchableOpacity 
-            style={[styles.deleteButton, { backgroundColor: theme.danger }]} 
-            onPress={confirmDelete}
-          >
-        <Text style={styles.deleteButtonText}>Görevi Sil</Text>
+      <TouchableOpacity
+        style={[styles.deleteButton, { bottom: (!task.completed ? 85 : 0) + insets.top + 10, backgroundColor: theme.danger + '20' }]}
+        onPress={handleDelete}
+      >
+        <Text style={[styles.deleteButtonText, { color: theme.danger }]}>Görevi Sil</Text>
       </TouchableOpacity>
-        </View>
-    </ScrollView>
     </View>
   );
 };
@@ -297,33 +331,30 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
   },
   priorityBadge: {
-    alignSelf: 'flex-start',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
-    marginBottom: 12,
+    borderRadius: 20,
   },
   priorityText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   timeRemaining: {
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  overdue: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
   timeText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  overdueText: {
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   content: {
     padding: 20,
@@ -334,84 +365,115 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
   },
   description: {
     fontSize: 16,
     lineHeight: 24,
   },
-  dateContainer: {
+  deadlineContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
+    gap: 8,
   },
-  dateText: {
-    marginLeft: 12,
+  deadline: {
     fontSize: 16,
   },
-
+  infoSection: {
+    backgroundColor: '#f8f9fa',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 8,
     borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
   },
   infoLabel: {
-    fontSize: 16,
+    fontSize: 14,
+    color: '#666',
   },
   infoValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
+    color: '#007AFF',
   },
-  actionButtons: {
+  actions: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
+    justifyContent: 'space-between',
+    marginTop: 30,
+    gap: 8,
   },
   actionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: 8,
-    marginHorizontal: 6,
   },
-  editButton: {
-    borderWidth: 2,
+  editButton: {},
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
   editButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    color: '#007AFF',
   },
   completeButton: {
+    backgroundColor: '#007AFF',
   },
   completeButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    paddingHorizontal: 15,
+    paddingTop: 15,
+    borderTopWidth: 1,
+  },
+  button: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    borderRadius: 12,
+    marginHorizontal: 5,
+  },
+  buttonText: {
+    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   deleteButton: {
-    marginHorizontal: 20,
-    marginTop: 10,
-    marginBottom: 30,
-    paddingVertical: 16,
-    borderRadius: 8,
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    padding: 15,
+    borderRadius: 12,
     alignItems: 'center',
   },
   deleteButtonText: {
-    color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
 });
 

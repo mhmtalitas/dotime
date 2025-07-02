@@ -14,18 +14,20 @@ const { width } = Dimensions.get('window');
 
 // Bu, eski UI'ı temel alan ama hataları giderilmiş YENİ bileşen.
 const CustomDateTimePicker = ({
-  visible,
-  onClose,
+  isVisible,
+  onCancel,
   onConfirm,
-  initialDate = new Date(),
+  date: initialDate = new Date(),
   mode = 'date' // 'date' or 'time'
 }) => {
   const [date, setDate] = useState(initialDate);
 
   // Görünürlük değiştiğinde veya başlangıç tarihi değiştiğinde state'i güncelle
   useEffect(() => {
-    setDate(initialDate);
-  }, [visible, initialDate]);
+    if (isVisible) {
+      setDate(initialDate || new Date());
+    }
+  }, [isVisible]);
 
   const months = [
     'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
@@ -62,7 +64,7 @@ const CustomDateTimePicker = ({
   const handleConfirm = () => {
     // Sadece state'deki güncel tarihi onayla
     onConfirm(date);
-    onClose();
+    onCancel();
   };
   
   const renderDatePicker = () => {
@@ -132,11 +134,11 @@ const CustomDateTimePicker = ({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
-      <TouchableOpacity style={styles.modalOverlay} onPress={onClose} />
+    <Modal visible={isVisible} animationType="slide" transparent={true} onRequestClose={onCancel}>
+      <TouchableOpacity style={styles.modalOverlay} onPress={onCancel} />
       <View style={styles.modalContent}>
         <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={onClose}><Text style={styles.headerButtonText}>İptal</Text></TouchableOpacity>
+            <TouchableOpacity onPress={onCancel}><Text style={styles.headerButtonText}>İptal</Text></TouchableOpacity>
             <Text style={styles.modalTitle}>{mode === 'date' ? 'Tarih Seç' : 'Saat Seç'}</Text>
             <TouchableOpacity onPress={handleConfirm}><Text style={[styles.headerButtonText, styles.confirmButton]}>Onayla</Text></TouchableOpacity>
         </View>

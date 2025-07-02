@@ -8,9 +8,11 @@ import {
   ScrollView,
   Alert,
   StatusBar,
+  Platform,
+  KeyboardAvoidingView,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,31 +20,48 @@ import CustomDateTimePicker from '../components/CustomDateTimePicker';
 import AttachmentPreview from '../components/AttachmentPreview';
 import notificationService from '../services/NotificationService';
 import { useTheme } from '../context/ThemeContext';
+import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const AddTaskScreen = ({ navigation }) => {
+const AddTaskScreen = () => {
   const { theme } = useTheme();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('Important');
-  const [deadline, setDeadline] = useState(() => {
-    // Düzeltme: Başlangıç saatini mevcut lokal saate göre ayarla.
-    // Ekstra dakika ekleme yok, saniyeler temizleniyor.
-    const now = new Date();
-    now.setSeconds(0);
-    now.setMilliseconds(0);
-    return now;
-  });
+  const [category, setCategory] = useState('Work');
+  const [deadline, setDeadline] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [attachments, setAttachments] = useState([]);
+  const [priority, setPriority] = useState('medium');
 
-  const categories = [
-    { key: 'Urgent', label: 'Acil', color: '#FF3B30' },
-    { key: 'Important', label: 'Önemli', color: '#007AFF' },
-    { key: 'Work', label: 'İş', color: '#6F42C1' },
-    { key: 'Personal', label: 'Kişisel', color: '#28A745' },
+  const taskCategories = [
+    { key: 'Urgent', label: 'Acil', icon: 'flame-outline', color: '#FF3B30' },
+    { key: 'Important', label: 'Önemli', icon: 'star-outline', color: '#007AFF' },
+    { key: 'Work', label: 'İş', icon: 'briefcase-outline', color: '#AF52DE' },
+    { key: 'Personal', label: 'Kişisel', icon: 'person-outline', color: '#34C759' },
   ];
+
+  const addTask = async (newTask) => {
+    try {
+      const storedTasks = await AsyncStorage.getItem('tasks');
+      const tasks = storedTasks ? JSON.parse(storedTasks) : [];
+      
+      const taskWithId = {
+        ...newTask,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString(),
+      };
+      
+      tasks.push(taskWithId);
+      await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+    } catch (error) {
+      console.error('Error adding task:', error);
+      Alert.alert('Hata', 'Görev eklenirken bir hata oluştu');
+    }
+  };
 
   const pickDocument = async () => {
     try {
@@ -115,87 +134,42 @@ const AddTaskScreen = ({ navigation }) => {
   };
 
   const handleDateConfirm = (selectedDate) => {
-    // Düzeltme: Saat dilimi sorununu önlemek için parçaları birleştir
-    const newDeadline = new Date(deadline); // Önceki saat/dakika bilgisini koru
+    const newDeadline = new Date(deadline);
     newDeadline.setFullYear(selectedDate.getFullYear());
     newDeadline.setMonth(selectedDate.getMonth());
     newDeadline.setDate(selectedDate.getDate());
     setDeadline(newDeadline);
-    setShowDatePicker(false); // Pencereyi kapat
+    setShowDatePicker(false);
   };
 
   const handleTimeConfirm = (selectedTime) => {
-    // Düzeltme: Saat dilimi sorununu önlemek için parçaları birleştir
-    const newDeadline = new Date(deadline); // Önceki tarih bilgisini koru
+    const newDeadline = new Date(deadline);
     newDeadline.setHours(selectedTime.getHours());
     newDeadline.setMinutes(selectedTime.getMinutes());
-    newDeadline.setSeconds(0); // Saniyeleri sıfırla
-    newDeadline.setMilliseconds(0); // Milisaniyeleri sıfırla
+    newDeadline.setSeconds(0);
+    newDeadline.setMilliseconds(0);
 
     setDeadline(newDeadline);
-    setShowTimePicker(false); // Pencereyi kapat
+    setShowTimePicker(false);
   };
 
-  const saveTask = async () => {
-    if (!title.trim()) {
-      Alert.alert('Uyarı', 'Lütfen görev başlığını girin');
+  const handleAddTask = async () => {
+    if (title.trim() === '') {
+      Alert.alert('Uyarı', 'Lütfen bir başlık girin.');
       return;
     }
-
-    if (!description.trim()) {
-      Alert.alert('Uyarı', 'Lütfen görev açıklamasını girin');
-      return;
-    }
-
-    try {
-      // Debug: Görev zamanını kontrol et
-      const now = new Date();
-      console.log('🕐 GÖREV KAYDETME DEBUG:');
-      console.log('Şu anki zaman:', now.toLocaleString('tr-TR'));
-      console.log('Görev bitiş zamanı:', deadline.toLocaleString('tr-TR'));
-      console.log('Kalan süre (dakika):', Math.floor((deadline - now) / (1000 * 60)));
-      
-      const newTask = {
-        id: Date.now().toString(),
-        title: title.trim(),
-        description: description.trim(),
-        category,
-        deadline: deadline.getTime(), // Lokal saatin timestamp'i, bu doğru
-        attachments,
-        completed: false,
-        createdAt: new Date().getTime(),
-      };
-
-      const existingTasks = await AsyncStorage.getItem('tasks');
-      const tasks = existingTasks ? JSON.parse(existingTasks) : [];
-      tasks.push(newTask);
-      
-      await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
-
-      // Bildirim sistemini başlat ve çoklu hatırlatma zamanla
-      let notificationMessage = '';
-      try {
-        await notificationService.requestPermissions();
-        const scheduledNotifications = await notificationService.scheduleMultipleReminders(newTask);
-        console.log(`${scheduledNotifications.length} bildirim zamanlandı`);
-        
-        if (scheduledNotifications.length > 0) {
-          const reminderTimes = scheduledNotifications.map(n => n.label).join(', ');
-          notificationMessage = `\n📅 Hatırlatmalar: ${reminderTimes} önce`;
-        } else {
-          notificationMessage = '\n⏰ Hatırlatma zamanı geçmiş, bildirim zamanlanmadı';
-        }
-      } catch (notificationError) {
-        console.error('Bildirim zamanlanırken hata:', notificationError);
-        notificationMessage = '\n⚠️ Bildirim ayarlanırken hata oluştu';
-      }
-
-      Alert.alert('Başarılı', `🎉 Görev başarıyla eklendi!${notificationMessage}`, [
-        { text: 'Tamam', onPress: () => navigation.goBack() }
-      ]);
-    } catch (error) {
-      Alert.alert('Hata', 'Görev eklenirken bir hata oluştu');
-    }
+    const newTask = {
+      title,
+      description,
+      deadline: deadline.toISOString(),
+      priority,
+      category,
+      completed: false,
+    };
+    await addTask(newTask);
+    Alert.alert('Başarılı', 'Yeni görev eklendi!', [
+      { text: 'Tamam', onPress: () => navigation.goBack() }
+    ]);
   };
 
   const formatDate = (date) => {
@@ -208,338 +182,287 @@ const AddTaskScreen = ({ navigation }) => {
     } else if (date.toDateString() === tomorrow.toDateString()) {
       return 'Yarın';
     } else {
-      // Manuel tarih formatı, locale kullanma
       const months = [
         'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
         'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
       ];
-      const day = date.getDate();
-      const month = months[date.getMonth()];
-      const year = date.getFullYear();
-      return `${day} ${month} ${year}`;
+      return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
     }
   };
 
   const formatTime = (date) => {
-    // Telefonun local saatini kullan, timezone dönüşümü yapma
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
     return `${hours}:${minutes}`;
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    scrollContainer: {
+      padding: 20,
+      flexGrow: 1,
+    },
+    label: {
+      fontSize: 16,
+      fontWeight: '600',
+      marginBottom: 10,
+      color: theme.text,
+    },
+    inputContainer: {
+      marginBottom: 20,
+    },
+    textInputWrapper: {
+      backgroundColor: theme.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    input: {
+      padding: 16,
+      fontSize: 16,
+      color: theme.text,
+    },
+    descriptionInput: {
+      height: 120,
+      textAlignVertical: 'top',
+    },
+    categoryContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+      marginBottom: 20,
+    },
+    categoryButton: {
+      width: '48%',
+      aspectRatio: 1.5,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderRadius: 15,
+      borderWidth: 1.5,
+      marginBottom: 10,
+      padding: 5,
+    },
+    categoryButtonText: {
+      marginTop: 8,
+      fontSize: 14,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    dateTimeDisplay: {
+      borderRadius: 16,
+      padding: 24,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.surface,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    dateTimeInfo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    dateTimeTexts: {
+      marginLeft: 16,
+      alignItems: 'center',
+    },
+    dateText: {
+      fontSize: 20,
+      fontWeight: '700',
+      marginBottom: 4,
+      color: theme.text,
+    },
+    timeText: {
+      fontSize: 18,
+      fontWeight: '500',
+      color: theme.textSecondary,
+    },
+    dateTimeButtons: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    dateTimeButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 16,
+      paddingHorizontal: 20,
+      borderRadius: 12,
+      gap: 8,
+    },
+    dateButtonText: {
+      color: 'white',
+      fontWeight: '600',
+    },
+    saveButton: {
+      backgroundColor: theme.primary,
+      padding: 18,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 10,
+    },
+    saveButtonText: {
+      color: 'white',
+      fontSize: 18,
+      fontWeight: 'bold',
+    },
+    attachmentButton: {
+      borderRadius: 8,
+      padding: 15,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.surface,
+      marginBottom: 10,
+    },
+    attachmentButtonText: {
+      marginLeft: 8,
+      fontSize: 16,
+      fontWeight: '500',
+      color: theme.text,
+    },
+  });
+
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <StatusBar 
         barStyle={theme.statusBarStyle} 
         backgroundColor={theme.background}
       />
-      <ScrollView 
-        style={[styles.scrollView, { paddingTop: insets.top + 15 }]}
-        showsVerticalScrollIndicator={false}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 100 }}
-      >
-        <View style={styles.form}>
-        {/* Başlık */}
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.inputContainer}>
-          <Text style={[styles.label, { color: theme.text }]}>Başlık</Text>
-          <TextInput
-            style={[styles.input, { 
-              backgroundColor: theme.surface,
-              color: theme.text,
-              borderColor: theme.border
-            }]}
-            placeholder="Görev başlığını girin"
-            placeholderTextColor={theme.textSecondary}
-            value={title}
-            onChangeText={setTitle}
-            maxLength={100}
-          />
-        </View>
-
-        {/* Açıklama */}
-        <View style={styles.inputContainer}>
-          <Text style={[styles.label, { color: theme.text }]}>Açıklama</Text>
-          <TextInput
-            style={[styles.input, styles.textArea, { 
-              backgroundColor: theme.surface,
-              color: theme.text,
-              borderColor: theme.border
-            }]}
-            placeholder="Görev açıklamasını girin"
-            placeholderTextColor={theme.textSecondary}
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-          />
-        </View>
-
-        {/* Kategori */}
-        <View style={styles.inputContainer}>
-          <Text style={[styles.label, { color: theme.text }]}>Kategori</Text>
-          <View style={styles.categoryContainer}>
-            {categories.map((cat) => (
-              <TouchableOpacity
-                key={cat.key}
-                style={[
-                  styles.categoryButton,
-                  { 
-                    backgroundColor: category === cat.key ? cat.color : theme.surface,
-                    borderColor: category === cat.key ? cat.color : theme.border 
-                  }
-                ]}
-                onPress={() => setCategory(cat.key)}
-              >
-                <Text style={[
-                  styles.categoryText,
-                  { color: category === cat.key ? 'white' : theme.text }
-                ]}>
-                  {cat.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          <Text style={styles.label}>Başlık</Text>
+          <View style={[styles.textInputWrapper]}>
+            <TextInput
+              style={styles.input}
+              placeholder="Görev başlığını girin..."
+              value={title}
+              onChangeText={setTitle}
+              maxLength={100}
+              autoCorrect={false}
+              spellCheck={false}
+            />
           </View>
         </View>
 
-        {/* Tarih ve Saat Seçimi */}
         <View style={styles.inputContainer}>
-          <Text style={[styles.label, { color: theme.text }]}>Son Tarih ve Saat</Text>
-          
-          {/* Seçilen Tarih ve Saat Gösterimi */}
-          <View style={[styles.dateTimeDisplay, { 
-            backgroundColor: theme.surface,
-            borderColor: theme.border 
-          }]}>
+          <Text style={styles.label}>Açıklama</Text>
+          <View style={[styles.textInputWrapper]}>
+            <TextInput
+              style={[styles.input, styles.descriptionInput]}
+              placeholder="Açıklama ekleyin..."
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+              autoCorrect={false}
+              spellCheck={false}
+            />
+          </View>
+        </View>
+
+        <Text style={styles.label}>Kategori</Text>
+        <View style={styles.categoryContainer}>
+          {taskCategories.map((cat) => (
+            <TouchableOpacity
+              key={cat.key}
+              onPress={() => setCategory(cat.key)}
+              style={[
+                styles.categoryButton,
+                { 
+                  backgroundColor: category === cat.key ? cat.color : theme.surface,
+                  borderColor: category === cat.key ? cat.color : theme.border,
+                }
+              ]}
+            >
+              <Ionicons 
+                name={cat.icon}
+                size={30} 
+                color={category === cat.key ? 'white' : theme.textSecondary}
+              />
+              <Text style={{
+                ...styles.categoryButtonText,
+                color: category === cat.key ? 'white' : theme.textSecondary,
+              }}>{cat.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Son Tarih ve Saat</Text>
+          <View style={[styles.dateTimeDisplay]}>
             <View style={styles.dateTimeInfo}>
               <Ionicons name="calendar" size={24} color={theme.primary} />
               <View style={styles.dateTimeTexts}>
-                <Text style={[styles.dateText, { color: theme.text }]}>{formatDate(deadline)}</Text>
-                <Text style={[styles.timeText, { color: theme.textSecondary }]}>{formatTime(deadline)}</Text>
+                <Text style={styles.dateText}>{formatDate(deadline)}</Text>
+                <Text style={styles.timeText}>{formatTime(deadline)}</Text>
               </View>
             </View>
           </View>
-
-          {/* Tarih ve Saat Seçim Butonları */}
           <View style={styles.dateTimeButtons}>
             <TouchableOpacity
-              style={[styles.dateTimeButton, styles.dateButton, { backgroundColor: theme.primary }]}
+              style={[styles.dateTimeButton, { backgroundColor: theme.primary }]}
               onPress={() => setShowDatePicker(true)}
             >
               <Ionicons name="calendar-outline" size={20} color="white" />
-              <Text style={styles.dateTimeButtonText}>Tarih Seç</Text>
+              <Text style={styles.dateButtonText}>Tarih Seç</Text>
             </TouchableOpacity>
-            
             <TouchableOpacity
-              style={[styles.dateTimeButton, styles.timeButton, { backgroundColor: theme.success }]}
+              style={[styles.dateTimeButton, { backgroundColor: theme.success }]}
               onPress={() => setShowTimePicker(true)}
             >
               <Ionicons name="time-outline" size={20} color="white" />
-              <Text style={styles.dateTimeButtonText}>Saat Seç</Text>
+              <Text style={styles.dateButtonText}>Saat Seç</Text>
             </TouchableOpacity>
           </View>
         </View>
+        
+        <CustomDateTimePicker
+          isVisible={showDatePicker}
+          mode="date"
+          onConfirm={handleDateConfirm}
+          onCancel={() => setShowDatePicker(false)}
+        />
+        <CustomDateTimePicker
+          isVisible={showTimePicker}
+          mode="time"
+          onConfirm={handleTimeConfirm}
+          onCancel={() => setShowTimePicker(false)}
+        />
 
-        {/* Ek Dosyalar */}
         <View style={styles.inputContainer}>
-          <Text style={[styles.label, { color: theme.text }]}>Ek Dosyalar</Text>
-          <TouchableOpacity
-            style={[styles.attachmentButton, { 
-              backgroundColor: theme.surface,
-              borderColor: theme.border 
-            }]}
-            onPress={showAttachmentOptions}
-          >
-            <Ionicons name="attach" size={20} color={theme.primary} />
-            <Text style={[styles.attachmentButtonText, { color: theme.text }]}>Dosya Ekle</Text>
-          </TouchableOpacity>
-
-          <AttachmentPreview 
+          <Text style={styles.label}>Ek Dosyalar</Text>
+          <AttachmentPreview
             attachments={attachments}
-            onRemove={removeAttachment}
-            editable={true}
+            onRemove={(file) => setAttachments(attachments.filter(a => a.uri !== file.uri))}
           />
+          <TouchableOpacity style={styles.attachmentButton} onPress={pickDocument}>
+            <Ionicons name="attach-outline" size={20} color={theme.text} />
+            <Text style={styles.attachmentButtonText}>Dosya Ekle</Text>
+          </TouchableOpacity>
         </View>
-
-        {/* Kaydet Butonu */}
-        <TouchableOpacity 
-          style={[styles.saveButton, { backgroundColor: theme.success }]} 
-          onPress={saveTask}
-        >
-          <Ionicons name="checkmark-circle" size={20} color="white" style={{ marginRight: 8 }} />
+        
+        <TouchableOpacity style={styles.saveButton} onPress={handleAddTask}>
           <Text style={styles.saveButtonText}>Görevi Kaydet</Text>
         </TouchableOpacity>
-        </View>
-
-      {/* Custom Date Picker */}
-      <CustomDateTimePicker
-        visible={showDatePicker}
-        mode="date"
-        is24Hour={true} // 24 saat formatını kullan
-        initialDate={deadline}
-        onClose={() => setShowDatePicker(false)}
-        onConfirm={handleDateConfirm}
-      />
-
-      {/* Custom Time Picker */}
-      <CustomDateTimePicker
-        visible={showTimePicker}
-        mode="time"
-        is24Hour={true} // 24 saat formatını kullan
-        initialDate={deadline}
-        onClose={() => setShowTimePicker(false)}
-        onConfirm={handleTimeConfirm}
-      />
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  form: {
-    padding: 20,
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  input: {
-    borderRadius: 8,
-    padding: 15,
-    fontSize: 16,
-    borderWidth: 1,
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  categoryContainer: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  categoryButton: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  categoryText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  dateTimeDisplay: {
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 16,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  dateTimeInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dateTimeTexts: {
-    marginLeft: 16,
-    alignItems: 'center',
-  },
-  dateText: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  timeText: {
-    fontSize: 18,
-    fontWeight: '500',
-  },
-  dateTimeButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  dateTimeButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  dateButton: {
-  },
-  timeButton: {
-  },
-  dateTimeButtonText: {
-    fontSize: 16,
-    color: 'white',
-    fontWeight: '600',
-  },
-  attachmentButton: {
-    borderRadius: 8,
-    padding: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    marginBottom: 10,
-  },
-  attachmentButtonText: {
-    marginLeft: 8,
-    fontSize: 16,
-    fontWeight: '500',
-  },
-
-  saveButton: {
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    borderRadius: 12,
-    marginTop: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  saveButtonText: {
-    color: 'white',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-});
 
 export default AddTaskScreen; 

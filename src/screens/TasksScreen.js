@@ -3,121 +3,97 @@ import {
   View,
   Text,
   StyleSheet,
+  FlatList,
   TouchableOpacity,
   SafeAreaView,
-  FlatList,
+  Alert,
+  Image,
   StatusBar,
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation, useRoute, useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const TasksScreen = ({ navigation }) => {
-  const [taskStats, setTaskStats] = useState({
-    total: 0,
-    completed: 0,
-    pending: 0,
-    overdue: 0,
-  });
+const getPriorityText = (priority) => {
+  switch (priority) {
+    case 'Urgent':
+      return 'Acil';
+    case 'Important':
+      return 'Önemli';
+    case 'Work':
+      return 'İş';
+    case 'Personal':
+      return 'Kişisel';
+    default:
+      return 'Normal';
+  }
+};
 
-  const [recentTasks, setRecentTasks] = useState([]);
+const formatDeadline = (deadline) => {
+    const date = new Date(deadline);
+    const today = new Date();
+    
+    const options = { hour: '2-digit', minute: '2-digit' };
+    const time = date.toLocaleTimeString('tr-TR', options);
+
+    if (date.toDateString() === today.toDateString()) {
+        return `Bugün ${time}`;
+    }
+    
+    const day = date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+    return `${day} ${time}`;
+};
+
+const TasksScreen = () => {
+  const navigation = useNavigation();
+  const route = useRoute();
   const { theme } = useTheme();
+  const [tasks, setTasks] = useState([]);
+  const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
 
-  useEffect(() => {
-    loadStats();
-  }, []);
+  const filter = route.params?.filter;
+  const title = route.params?.title || 'Tüm Görevler';
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      loadStats();
-    });
-    return unsubscribe;
-  }, [navigation]);
+    if (isFocused) {
+      loadTasks();
+    }
+  }, [isFocused]);
 
-  const loadStats = async () => {
+  const loadTasks = async () => {
     try {
-      console.log('Loading task statistics...');
       const storedTasks = await AsyncStorage.getItem('tasks');
-      
-      // Varsayılan değerler
-      let stats = {
-        total: 0,
-        completed: 0,
-        pending: 0,
-        overdue: 0
-      };
-      
       if (storedTasks) {
-        try {
-          const tasks = JSON.parse(storedTasks);
-          
-          if (!Array.isArray(tasks)) {
-            console.error('Stored tasks is not an array:', tasks);
-            setTaskStats(stats);
-            setRecentTasks([]);
-            return;
-          }
-          
-          const validTasks = tasks.filter(task => task && typeof task === 'object');
-          
-          stats.total = validTasks.length;
-          stats.completed = validTasks.filter(task => task.completed).length;
-          stats.pending = validTasks.filter(task => !task.completed).length;
-          
-          // Süresi geçmiş görevleri bul
-          const now = new Date();
-          stats.overdue = validTasks.filter(task => {
-            if (task.completed) return false;
-            try {
-              const deadline = new Date(task.deadline);
-              return deadline < now;
-            } catch (dateError) {
-              console.error('Invalid date format for task:', task);
-              return false;
-            }
-          }).length;
-
-          console.log('Stats calculated successfully:', stats);
-          setTaskStats(stats);
-
-          // Son 5 aktif görevi al
-          const activeTasks = validTasks
-            .filter(task => !task.completed)
-            .sort((a, b) => {
-              try {
-                return new Date(a.deadline) - new Date(b.deadline);
-              } catch (dateError) {
-                console.error('Date comparison error:', dateError);
-                return 0;
-              }
-            })
-            .slice(0, 5);
-          
-          console.log('Recent tasks loaded:', activeTasks.length);
-          setRecentTasks(activeTasks);
-        } catch (parseError) {
-          console.error('Tasks parsing error:', parseError);
-          setTaskStats(stats);
-          setRecentTasks([]);
+        const parsedTasks = JSON.parse(storedTasks);
+        if (Array.isArray(parsedTasks)) {
+          const incompleteTasks = parsedTasks
+            .filter(task => task && !task.completed)
+            .sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+          setTasks(incompleteTasks);
+        } else {
+          setTasks([]);
         }
       } else {
-        console.log('No stored tasks found');
-        setTaskStats(stats);
-        setRecentTasks([]);
+        setTasks([]);
       }
     } catch (error) {
-      console.error('Error loading task statistics:', error);
-      setTaskStats({
-        total: 0,
-        completed: 0,
-        pending: 0,
-        overdue: 0
-      });
-      setRecentTasks([]);
+      console.error('Error loading tasks:', error);
+      setTasks([]);
     }
+  };
+
+  const getDeadlineColor = (deadline) => {
+    const now = new Date();
+    const deadlineDate = new Date(deadline);
+    const diffDays = (deadlineDate.setHours(0,0,0,0) - now.setHours(0,0,0,0)) / (1000 * 60 * 60 * 24);
+
+    if (diffDays < 0) return theme.danger; // Overdue
+    if (diffDays < 1) return '#FF9500'; // Due today (Orange)
+    return theme.textSecondary; // Not urgent
   };
 
   const getPriorityColor = (priority) => {
@@ -135,390 +111,197 @@ const TasksScreen = ({ navigation }) => {
     }
   };
 
-  const getPriorityText = (priority) => {
-    switch (priority) {
-      case 'Urgent':
-        return 'Acil';
-      case 'Important':
-        return 'Önemli';
-      case 'Work':
-        return 'İş';
-      case 'Personal':
-        return 'Kişisel';
-      default:
-        return 'Normal';
-    }
-  };
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    if (date.toDateString() === today.toDateString()) {
-      return 'Bugün';
-    } else if (date.toDateString() === tomorrow.toDateString()) {
-      return 'Yarın';
-    } else {
-      return date.toLocaleDateString('tr-TR');
-    }
-  };
-
-  const isOverdue = (deadline) => {
+  const isTaskOverdue = (deadline) => {
     return new Date(deadline) < new Date();
   };
 
-  const renderQuickAction = (icon, title, subtitle, onPress, color = '#007AFF') => (
-    <TouchableOpacity style={[styles.quickActionCard, { backgroundColor: theme.surface }]} onPress={onPress}>
-      <View style={[styles.quickActionIcon, { backgroundColor: color + '20' }]}>
-        <Ionicons name={icon} size={24} color={color} />
-      </View>
-      <View style={styles.quickActionText}>
-        <Text style={[styles.quickActionTitle, { color: theme.text }]}>{title}</Text>
-        <Text style={[styles.quickActionSubtitle, { color: theme.textSecondary }]}>{subtitle}</Text>
-      </View>
-      <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-    </TouchableOpacity>
-  );
+  const markAsCompleted = async (taskId) => {
+    try {
+      const storedTasks = await AsyncStorage.getItem('tasks');
+      if (storedTasks) {
+        const parsedTasks = JSON.parse(storedTasks);
+        const updatedTasks = parsedTasks.map(task => 
+          task.id === taskId ? { ...task, completed: true, completedAt: new Date().toISOString() } : task
+        );
+        await AsyncStorage.setItem('tasks', JSON.stringify(updatedTasks));
+        loadTasks(); // Listeyi yenile
+      }
+    } catch (error) {
+      console.error('Error completing task:', error);
+    }
+  };
 
-  const renderTaskItem = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.taskItem, { borderBottomColor: theme.border }]}
-      onPress={() => navigation.navigate('TaskDetail', { task: item })}
-    >
-      <View style={styles.taskItemHeader}>
-        <View style={[styles.priorityDot, { backgroundColor: getPriorityColor(item.category) }]} />
-        <Text style={[styles.taskItemTitle, { color: theme.text }]} numberOfLines={1}>
-          {item.title}
-        </Text>
-        {isOverdue(item.deadline) && (
-          <View style={styles.overdueIndicator}>
-            <Text style={styles.overdueText}>GEÇİKMİŞ</Text>
-          </View>
-        )}
-      </View>
-      <Text style={[
-        styles.taskItemDate,
-        { color: theme.primary },
-        isOverdue(item.deadline) && styles.overdueDate
-      ]}>
-        {formatDate(item.deadline)}
-      </Text>
-    </TouchableOpacity>
-  );
+  const confirmComplete = (task) => {
+    Alert.alert(
+      'Görevi Tamamla',
+      `"${task.title}" görevini tamamladınız mı?`,
+      [
+        { text: 'İptal', style: 'cancel' },
+        { text: 'Tamamla', onPress: () => markAsCompleted(task.id) },
+      ]
+    );
+  };
+  
+  const renderTaskCard = ({ item }) => {
+    const isOverdue = isTaskOverdue(item.deadline);
+    const categoryColor = getPriorityColor(item.category);
+
+    const cardStyle = isOverdue 
+        ? [styles.card, { backgroundColor: theme.danger }] 
+        : [styles.card, { backgroundColor: theme.surface, borderColor: categoryColor, borderWidth: 1.5 }];
+
+    const textColor = isOverdue ? '#fff' : theme.text;
+    const deadlineColor = isOverdue ? '#fff' : categoryColor;
+    const checkmarkColor = isOverdue ? '#fff' : theme.success;
+
+    return (
+        <TouchableOpacity 
+            style={cardStyle}
+            onPress={() => navigation.navigate('TaskDetail', { task: item })}
+            onLongPress={() => confirmComplete(item)}
+        >
+            <View style={styles.cardHeader}>
+                <View style={[styles.categoryBadge, { backgroundColor: categoryColor }]}>
+                    <Text style={styles.categoryText}>{getPriorityText(item.category)}</Text>
+                </View>
+                {isOverdue && (
+                    <View style={styles.statusBadge}>
+                        <Ionicons name="alert-circle-outline" size={14} color="#fff" />
+                        <Text style={styles.statusText}>GECİKMİŞ</Text>
+                    </View>
+                )}
+                <TouchableOpacity onPress={() => confirmComplete(item)} style={styles.completeButton}>
+                     <Ionicons name="checkmark-circle-outline" size={26} color={checkmarkColor} />
+                </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.title, { color: textColor }]}>{item.title}</Text>
+            
+            <View style={styles.footer}>
+                <Ionicons name="time-outline" size={16} color={deadlineColor} />
+                <Text style={[styles.deadline, { color: deadlineColor }]}>
+                    {formatDeadline(item.deadline)}
+                </Text>
+            </View>
+        </TouchableOpacity>
+    );
+  };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 }]}>
       <StatusBar 
         barStyle={theme.statusBarStyle} 
-        backgroundColor={theme.background}
+        backgroundColor={theme.primary}
         translucent={false}
       />
-      <View style={[styles.header, { 
-        paddingTop: insets.top + 15,
-        backgroundColor: theme.background,
-        borderBottomColor: theme.border
-      }]}>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Görev Özeti</Text>
-      </View>
-
-      <FlatList
-        data={[]}
-        renderItem={() => null}
-        showsVerticalScrollIndicator={false}
-        ListHeaderComponent={() => (
-          <View style={styles.content}>
-            {/* İstatistik Kartları */}
-            <View style={styles.statsContainer}>
-              <View style={styles.statsRow}>
-                <View style={[styles.statCard, styles.primaryCard]}>
-                  <Text style={styles.statNumber}>{taskStats.total}</Text>
-                  <Text style={styles.statLabel}>Toplam Görev</Text>
-                </View>
-                
-                <View style={[styles.statCard, styles.successCard]}>
-                  <Text style={styles.statNumber}>{taskStats.completed}</Text>
-                  <Text style={styles.statLabel}>Tamamlanan</Text>
-                </View>
-              </View>
-              
-              <View style={styles.statsRow}>
-                <View style={[styles.statCard, styles.warningCard]}>
-                  <Text style={styles.statNumber}>{taskStats.pending}</Text>
-                  <Text style={styles.statLabel}>Bekleyen</Text>
-                </View>
-                
-                <View style={[styles.statCard, styles.dangerCard]}>
-                  <Text style={styles.statNumber}>{taskStats.overdue}</Text>
-                  <Text style={styles.statLabel}>Gecikmiş</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Hızlı Eylemler */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Hızlı Eylemler</Text>
-              
-              {renderQuickAction(
-                'add-circle-outline',
-                'Yeni Görev Ekle',
-                'Hemen yeni bir görev oluştur',
-                () => navigation.navigate('AddTask'),
-                '#007AFF'
-              )}
-              
-              {renderQuickAction(
-                'checkmark-circle-outline',
-                'Tamamlanan Görevler',
-                `${taskStats.completed} tamamlanan görev`,
-                () => navigation.navigate('CompletedTasks'),
-                '#28A745'
-              )}
-              
-              {taskStats.overdue > 0 && renderQuickAction(
-                'warning-outline',
-                'Gecikmiş Görevler',
-                `${taskStats.overdue} görevin süresi geçmiş`,
-                () => navigation.navigate('OverdueTasks'),
-                '#FF3B30'
-              )}
-            </View>
-
-            {/* Yaklaşan Görevler */}
-            {recentTasks.length > 0 && (
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Text style={[styles.sectionTitle, { color: theme.text }]}>Yaklaşan Görevler</Text>
-                  <TouchableOpacity onPress={() => navigation.navigate('Ana Sayfa')}>
-                    <Text style={[styles.seeAllText, { color: theme.primary }]}>Tümünü Gör</Text>
-                  </TouchableOpacity>
-                </View>
-                
-                <View style={[styles.tasksContainer, { backgroundColor: theme.surface }]}>
-                  <FlatList
-                    data={recentTasks}
-                    renderItem={renderTaskItem}
-                    keyExtractor={(item) => item.id}
-                    scrollEnabled={false}
-                  />
-                </View>
-              </View>
-            )}
-
-            {/* Motivasyon Mesajı */}
-            <View style={[styles.motivationCard, { backgroundColor: theme.surface }]}>
-              <Ionicons name="trophy-outline" size={32} color="#FFD700" />
-              <Text style={[styles.motivationTitle, { color: theme.text }]}>
-                {taskStats.completed === 0
-                  ? 'İlk görevinizi tamamlamaya hazır mısınız?'
-                  : taskStats.completed < 5
-                  ? 'Harika gidiyorsunuz! Devam edin!'
-                  : taskStats.completed < 10
-                  ? 'Muhteşem! Gerçek bir görev kahramanısınız!'
-                  : 'İnanılmaz! Productivity ustası oldunuz!'}
-              </Text>
-              <Text style={[styles.motivationText, { color: theme.textSecondary }]}>
-                {taskStats.pending > 0
-                  ? `${taskStats.pending} göreviniz daha var. Hepsini tamamlayabilirsiniz!`
-                  : 'Tüm görevlerinizi tamamladınız! 🎉'}
-              </Text>
-            </View>
-          </View>
-        )}
-      />
-    </View>
+       {tasks.length === 0 ? (
+         <View style={styles.emptyState}>
+           <Ionicons name="list-outline" size={64} color={theme.textSecondary} />
+           <Text style={[styles.emptyTitle, { color: theme.text }]}>Henüz görev yok</Text>
+           <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+             İlk görevinizi eklemek için + butonuna tıklayın
+           </Text>
+         </View>
+       ) : (
+         <FlatList
+           data={tasks}
+           renderItem={renderTaskCard}
+           keyExtractor={(item) => item.id}
+           contentContainerStyle={styles.taskList}
+         />
+       )}
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E9ECEF',
+  taskList: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 32,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#212529',
-  },
-  content: {
-    padding: 20,
-  },
-  statsContainer: {
-    marginBottom: 24,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
-  },
-  statCard: {
-    flex: 1,
-    padding: 20,
-    borderRadius: 12,
-    alignItems: 'center',
+  card: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  primaryCard: {
-    backgroundColor: '#007AFF',
-  },
-  successCard: {
-    backgroundColor: '#28A745',
-  },
-  warningCard: {
-    backgroundColor: '#FFC107',
-  },
-  dangerCard: {
-    backgroundColor: '#FF3B30',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: 'white',
-    opacity: 0.9,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+  categoryBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
-  seeAllText: {
+  categoryText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    position: 'absolute',
+    left: '50%',
+    transform: [{ translateX: -45 }],
+  },
+  statusText: {
+    color: '#fff',
+    marginLeft: 4,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  completeButton: {
+    // position: 'absolute',
+    // top: 12,
+    // right: 12,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginVertical: 8,
+  },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  deadline: {
+    marginLeft: 6,
     fontSize: 14,
     fontWeight: '500',
   },
-  quickActionCard: {
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  quickActionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  emptyState: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    paddingHorizontal: 40,
   },
-  quickActionText: {
-    flex: 1,
-  },
-  quickActionTitle: {
-    fontSize: 16,
+  emptyTitle: {
+    fontSize: 20,
     fontWeight: '600',
-    marginBottom: 2,
-  },
-  quickActionSubtitle: {
-    fontSize: 14,
-  },
-  tasksContainer: {
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  taskItem: {
-    padding: 16,
-    borderBottomWidth: 1,
-  },
-  taskItemHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  priorityDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 12,
-  },
-  taskItemTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    flex: 1,
-  },
-  overdueIndicator: {
-    backgroundColor: '#FF3B30',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  overdueText: {
-    fontSize: 10,
-    color: 'white',
-    fontWeight: '600',
-  },
-  taskItemDate: {
-    fontSize: 14,
-    marginLeft: 20,
-  },
-  overdueDate: {
-    color: '#FF3B30',
-  },
-  motivationCard: {
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  motivationTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginTop: 12,
+    marginTop: 16,
     marginBottom: 8,
   },
-  motivationText: {
-    fontSize: 14,
+  emptySubtitle: {
+    fontSize: 16,
     textAlign: 'center',
+    marginBottom: 24,
   },
 });
 
