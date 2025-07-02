@@ -39,8 +39,20 @@ const HomeScreen = () => {
   );
   
   const paymentSummary = useMemo(() => {
-    const unpaidPayments = payments.filter(p => !p.isPaid);
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const unpaidPayments = payments.filter(p => {
+      if (p.isPaid) {
+        return false;
+      }
+      const paymentDate = new Date(p.dueDate);
+      return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear;
+    });
+
     const totalUnpaidAmount = unpaidPayments.reduce((sum, p) => sum + p.amount, 0);
+    
     return {
       count: unpaidPayments.length,
       totalAmount: totalUnpaidAmount,

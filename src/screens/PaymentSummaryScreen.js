@@ -27,6 +27,10 @@ const PaymentSummaryScreen = () => {
 
   const [viewMode, setViewMode] = useState('list');
   const [selectedDate, setSelectedDate] = useState('');
+  const [currentMonth, setCurrentMonth] = useState({ 
+    year: new Date().getFullYear(), 
+    month: new Date().getMonth() + 1 
+  });
 
   const summary = useMemo(() => {
     const now = new Date();
@@ -39,6 +43,21 @@ const PaymentSummaryScreen = () => {
     };
   }, [payments]);
   
+  const monthlySummary = useMemo(() => {
+    const filteredPayments = payments.filter(p => {
+      if (p.isPaid) return false;
+      const paymentDate = new Date(p.dueDate);
+      return paymentDate.getFullYear() === currentMonth.year && paymentDate.getMonth() + 1 === currentMonth.month;
+    });
+
+    const totalAmount = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    return {
+      count: filteredPayments.length,
+      totalAmount: totalAmount,
+    };
+  }, [payments, currentMonth]);
+
   const upcomingPayments = useMemo(() => {
      const now = new Date();
      return payments
@@ -50,7 +69,7 @@ const PaymentSummaryScreen = () => {
   const markedDates = useMemo(() => {
     const marks = {};
     payments
-      .filter(payment => payment.status !== 'completed') // Filter out completed payments
+      .filter(payment => !payment.isPaid) // Filter out completed payments
       .forEach(payment => {
         const dateString = new Date(payment.dueDate).toISOString().split('T')[0];
         if (!marks[dateString]) {
@@ -74,8 +93,16 @@ const PaymentSummaryScreen = () => {
   
   const paymentsOnSelectedDate = useMemo(() => {
     if (!selectedDate) return [];
-    return payments.filter(p => new Date(p.dueDate).toISOString().split('T')[0] === selectedDate);
+    return payments.filter(p => {
+        const paymentDate = new Date(p.dueDate).toISOString().split('T')[0];
+        return paymentDate === selectedDate && !p.isPaid;
+    });
   }, [payments, selectedDate]);
+
+  const handleMonthChange = (month) => {
+    setCurrentMonth({ year: month.year, month: month.month });
+    setSelectedDate('');
+  };
 
   const onDayPress = (day) => {
     const dateString = day.dateString;
@@ -170,9 +197,20 @@ const PaymentSummaryScreen = () => {
 
   const renderCalendarView = () => (
     <>
+      <View style={styles.monthlySummaryCard}>
+        <Text style={styles.monthlySummaryText}>
+            Bu ay <Text style={styles.monthlySummaryHighlight}>{monthlySummary.count} ödeme</Text> bekliyor.
+        </Text>
+        <Text style={styles.monthlySummaryTotal}>
+            {formatCurrency(monthlySummary.totalAmount)}
+        </Text>
+      </View>
       <Calendar
+        key={theme.dark ? 'dark-calendar' : 'light-calendar'}
+        markingType="multi-dot"
         current={new Date().toISOString().split('T')[0]}
         onDayPress={onDayPress}
+        onMonthChange={handleMonthChange}
         markedDates={markedDates}
         theme={{
           backgroundColor: theme.background,
@@ -249,10 +287,9 @@ const getStyles = (theme) => StyleSheet.create({
     paddingBottom: 40,
   },
   header: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
-    marginBottom: 10,
-    color: theme.text,
+    marginBottom: 20,
   },
   summaryGrid: {
     flexDirection: 'row',
@@ -402,6 +439,34 @@ const getStyles = (theme) => StyleSheet.create({
   },
   quickActionSubtitle: {
     fontSize: 14,
+  },
+  monthlySummaryCard: {
+    backgroundColor: theme.surface,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: theme.dark ? 0.25 : 0.05,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  monthlySummaryText: {
+    fontSize: 16,
+    color: theme.textSecondary,
+    marginBottom: 4,
+  },
+  monthlySummaryHighlight: {
+    fontWeight: 'bold',
+    color: theme.primary,
+  },
+  monthlySummaryTotal: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: theme.text,
   },
 });
 
