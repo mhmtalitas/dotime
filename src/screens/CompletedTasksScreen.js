@@ -131,6 +131,7 @@ const CompletedTasksScreen = () => {
   const renderTaskCard = ({ item }) => {
     const categoryStyle = getCategoryStyle(item.category);
     return (
+      <TouchableOpacity onPress={() => navigation.navigate('TaskDetail', { taskId: item.id })}>
         <View style={[styles.taskCard, { backgroundColor: theme.surface }]}>
             <View style={styles.taskHeader}>
                 <View style={styles.categoryBadge}>
@@ -158,6 +159,7 @@ const CompletedTasksScreen = () => {
                 </TouchableOpacity>
             </View>
         </View>
+      </TouchableOpacity>
     );
   };
   
@@ -185,7 +187,6 @@ const CompletedTasksScreen = () => {
             <Text style={[styles.sectionHeader, { color: theme.text }]}>{title}</Text>
           )}
           ListHeaderComponent={() => (
-            <>
               <View style={styles.deleteAllContainer}>
                 {completedTasks.length > 0 && (
                   <TouchableOpacity onPress={handleDeleteAll} style={styles.deleteAllButton}>
@@ -193,18 +194,6 @@ const CompletedTasksScreen = () => {
                   </TouchableOpacity>
                 )}
               </View>
-              <View style={[styles.statsCard, { backgroundColor: theme.surface }]}>
-                  <View style={styles.statItem}>
-                      <Text style={[styles.statNumber, { color: theme.primary }]}>{completedTasks.length}</Text>
-                      <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Tamamlanan Görev</Text>
-                  </View>
-                  <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-                  <View style={styles.statItem}>
-                      <Text style={[styles.statNumber, { color: theme.primary }]}>{dailyAverage}</Text>
-                      <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Günlük Ortalama</Text>
-                  </View>
-              </View>
-            </>
           )}
           contentContainerStyle={styles.listContainer}
         />
@@ -225,22 +214,6 @@ const styles = StyleSheet.create({
   deleteAllButton: { backgroundColor: '#FF3B30', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8 },
   deleteAllButtonText: { color: 'white', fontWeight: 'bold' },
   listContainer: { paddingBottom: 32 },
-  statsCard: {
-    marginVertical: 16,
-    marginHorizontal: 16,
-    padding: 20,
-    borderRadius: 12,
-    flexDirection: 'row',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  statItem: { flex: 1, alignItems: 'center' },
-  statNumber: { fontSize: 24, fontWeight: 'bold', marginBottom: 4 },
-  statLabel: { fontSize: 14 },
-  statDivider: { width: 1, marginHorizontal: 10 },
   sectionHeader: {
     fontSize: 18,
     fontWeight: 'bold',

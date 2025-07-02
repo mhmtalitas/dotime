@@ -38,10 +38,10 @@ const AddTaskScreen = () => {
   const [priority, setPriority] = useState('medium');
 
   const taskCategories = [
-    { key: 'Urgent', label: 'Acil', icon: 'flame-outline', color: '#FF3B30' },
-    { key: 'Important', label: 'Önemli', icon: 'star-outline', color: '#007AFF' },
-    { key: 'Work', label: 'İş', icon: 'briefcase-outline', color: '#AF52DE' },
-    { key: 'Personal', label: 'Kişisel', icon: 'person-outline', color: '#34C759' },
+    { key: 'Urgent', label: 'Acil', icon: 'flame-outline', color: theme.danger },
+    { key: 'Important', label: 'Önemli', icon: 'star-outline', color: theme.warning },
+    { key: 'Work', label: 'İş', icon: 'briefcase-outline', color: theme.primary },
+    { key: 'Personal', label: 'Kişisel', icon: 'person-outline', color: theme.success },
   ];
 
   const addTask = async (newTask) => {
@@ -196,251 +196,108 @@ const AddTaskScreen = () => {
     return `${hours}:${minutes}`;
   };
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.background,
-    },
-    scrollContainer: {
-      padding: 20,
-      flexGrow: 1,
-    },
-    label: {
-      fontSize: 16,
-      fontWeight: '600',
-      marginBottom: 10,
-      color: theme.text,
-    },
-    inputContainer: {
-      marginBottom: 20,
-    },
-    textInputWrapper: {
-      backgroundColor: theme.surface,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: theme.border,
-    },
-    input: {
-      padding: 16,
-      fontSize: 16,
-      color: theme.text,
-    },
-    descriptionInput: {
-      height: 120,
-      textAlignVertical: 'top',
-    },
-    categoryContainer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'space-between',
-      marginBottom: 20,
-    },
-    categoryButton: {
-      width: '48%',
-      aspectRatio: 1.5,
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderRadius: 15,
-      borderWidth: 1.5,
-      marginBottom: 10,
-      padding: 5,
-    },
-    categoryButtonText: {
-      marginTop: 8,
-      fontSize: 14,
-      fontWeight: '600',
-      textAlign: 'center',
-    },
-    dateTimeDisplay: {
-      borderRadius: 16,
-      padding: 24,
-      marginBottom: 16,
-      borderWidth: 1,
-      borderColor: theme.border,
-      backgroundColor: theme.surface,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
-      elevation: 4,
-    },
-    dateTimeInfo: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    dateTimeTexts: {
-      marginLeft: 16,
-      alignItems: 'center',
-    },
-    dateText: {
-      fontSize: 20,
-      fontWeight: '700',
-      marginBottom: 4,
-      color: theme.text,
-    },
-    timeText: {
-      fontSize: 18,
-      fontWeight: '500',
-      color: theme.textSecondary,
-    },
-    dateTimeButtons: {
-      flexDirection: 'row',
-      gap: 12,
-    },
-    dateTimeButton: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 16,
-      paddingHorizontal: 20,
-      borderRadius: 12,
-      gap: 8,
-    },
-    dateButtonText: {
-      color: 'white',
-      fontWeight: '600',
-    },
-    saveButton: {
-      backgroundColor: theme.primary,
-      padding: 18,
-      borderRadius: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: 10,
-    },
-    saveButtonText: {
-      color: 'white',
-      fontSize: 18,
-      fontWeight: 'bold',
-    },
-    attachmentButton: {
-      borderRadius: 8,
-      padding: 15,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: theme.border,
-      backgroundColor: theme.surface,
-      marginBottom: 10,
-    },
-    attachmentButtonText: {
-      marginLeft: 8,
-      fontSize: 16,
-      fontWeight: '500',
-      color: theme.text,
-    },
-  });
+  const styles = getStyles(theme);
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
     >
-      <StatusBar 
-        barStyle={theme.statusBarStyle} 
-        backgroundColor={theme.background}
-      />
+      <StatusBar barStyle={theme.dark ? 'light-content' : 'dark-content'} />
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Başlık</Text>
-          <View style={[styles.textInputWrapper]}>
+          <View style={styles.textInputWrapper}>
             <TextInput
               style={styles.input}
-              placeholder="Görev başlığını girin..."
               value={title}
               onChangeText={setTitle}
-              maxLength={100}
-              autoCorrect={false}
-              spellCheck={false}
+              placeholder="Görev başlığını girin..."
+              placeholderTextColor={theme.textSecondary}
             />
           </View>
         </View>
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Açıklama</Text>
-          <View style={[styles.textInputWrapper]}>
+          <View style={styles.textInputWrapper}>
             <TextInput
               style={[styles.input, styles.descriptionInput]}
-              placeholder="Açıklama ekleyin..."
               value={description}
               onChangeText={setDescription}
+              placeholder="Açıklama ekleyin..."
+              placeholderTextColor={theme.textSecondary}
               multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-              autoCorrect={false}
-              spellCheck={false}
             />
           </View>
         </View>
 
-        <Text style={styles.label}>Kategori</Text>
-        <View style={styles.categoryContainer}>
-          {taskCategories.map((cat) => (
-            <TouchableOpacity
-              key={cat.key}
-              onPress={() => setCategory(cat.key)}
-              style={[
-                styles.categoryButton,
-                { 
-                  backgroundColor: category === cat.key ? cat.color : theme.surface,
-                  borderColor: category === cat.key ? cat.color : theme.border,
-                }
-              ]}
-            >
-              <Ionicons 
-                name={cat.icon}
-                size={30} 
-                color={category === cat.key ? 'white' : theme.textSecondary}
-              />
-              <Text style={{
-                ...styles.categoryButtonText,
-                color: category === cat.key ? 'white' : theme.textSecondary,
-              }}>{cat.label}</Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Kategori</Text>
+          <View style={styles.categoryContainer}>
+            {taskCategories.map((item) => (
+              <TouchableOpacity
+                key={item.key}
+                style={[
+                  styles.categoryButton,
+                  {
+                    backgroundColor: category === item.key ? item.color : theme.surface,
+                    borderColor: category === item.key ? item.color : theme.border,
+                  },
+                ]}
+                onPress={() => setCategory(item.key)}
+              >
+                <Ionicons
+                  name={item.icon}
+                  size={30}
+                  color={category === item.key ? '#FFF' : item.color}
+                />
+                <Text
+                  style={[
+                    styles.categoryButtonText,
+                    { color: category === item.key ? '#FFF' : theme.text },
+                  ]}
+                >
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Son Tarih ve Saat</Text>
-          <View style={[styles.dateTimeDisplay]}>
-            <View style={styles.dateTimeInfo}>
-              <Ionicons name="calendar" size={24} color={theme.primary} />
-              <View style={styles.dateTimeTexts}>
-                <Text style={styles.dateText}>{formatDate(deadline)}</Text>
-                <Text style={styles.timeText}>{formatTime(deadline)}</Text>
-              </View>
+          <View style={styles.deadlineContainer}>
+            <Ionicons name="calendar" size={30} color={theme.primary} />
+            <View style={styles.deadlineTextContainer}>
+              <Text style={[styles.deadlineDate, { color: theme.text }]}>{formatDate(deadline)}</Text>
+              <Text style={[styles.deadlineTime, { color: theme.textSecondary }]}>{formatTime(deadline)}</Text>
             </View>
           </View>
-          <View style={styles.dateTimeButtons}>
-            <TouchableOpacity
-              style={[styles.dateTimeButton, { backgroundColor: theme.primary }]}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Ionicons name="calendar-outline" size={20} color="white" />
+          <View style={styles.dateButtonsContainer}>
+            <TouchableOpacity style={styles.dateButton} onPress={() => setShowDatePicker(true)}>
+              <Ionicons name="calendar" size={20} color={'#fff'} />
               <Text style={styles.dateButtonText}>Tarih Seç</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.dateTimeButton, { backgroundColor: theme.success }]}
-              onPress={() => setShowTimePicker(true)}
-            >
-              <Ionicons name="time-outline" size={20} color="white" />
+            <TouchableOpacity style={styles.timeButton} onPress={() => setShowTimePicker(true)}>
+              <Ionicons name="time" size={20} color={'#fff'} />
               <Text style={styles.dateButtonText}>Saat Seç</Text>
             </TouchableOpacity>
           </View>
         </View>
-        
+
         <CustomDateTimePicker
           isVisible={showDatePicker}
           mode="date"
+          value={deadline}
           onConfirm={handleDateConfirm}
           onCancel={() => setShowDatePicker(false)}
         />
         <CustomDateTimePicker
           isVisible={showTimePicker}
           mode="time"
+          value={deadline}
           onConfirm={handleTimeConfirm}
           onCancel={() => setShowTimePicker(false)}
         />
@@ -456,13 +313,161 @@ const AddTaskScreen = () => {
             <Text style={styles.attachmentButtonText}>Dosya Ekle</Text>
           </TouchableOpacity>
         </View>
-        
+      </ScrollView>
+
+      <View style={[styles.footer, { borderTopColor: theme.border }]}>
         <TouchableOpacity style={styles.saveButton} onPress={handleAddTask}>
           <Text style={styles.saveButtonText}>Görevi Kaydet</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
     </KeyboardAvoidingView>
   );
 };
+
+const getStyles = (theme) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.background,
+  },
+  scrollContainer: {
+    padding: 20,
+    flexGrow: 1,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 10,
+    color: theme.text,
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  textInputWrapper: {
+    backgroundColor: theme.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  input: {
+    padding: 16,
+    fontSize: 16,
+    color: theme.text,
+  },
+  descriptionInput: {
+    height: 120,
+    textAlignVertical: 'top',
+  },
+  categoryContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  categoryButton: {
+    width: '48%',
+    aspectRatio: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 15,
+    borderWidth: 1.5,
+    marginBottom: 10,
+    padding: 5,
+  },
+  categoryButtonText: {
+    marginTop: 8,
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  deadlineContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 15,
+    backgroundColor: theme.surface,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  deadlineTextContainer: {
+    marginLeft: 15,
+  },
+  deadlineDate: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.text,
+  },
+  deadlineTime: {
+    fontSize: 16,
+    color: theme.textSecondary,
+  },
+  dateButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  dateButton: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 10,
+    backgroundColor: theme.primary,
+    marginRight: 5,
+  },
+  timeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 10,
+    backgroundColor: theme.success,
+    marginLeft: 5,
+  },
+  dateButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 10,
+  },
+  footer: {
+    padding: 20,
+    backgroundColor: theme.background,
+    borderTopWidth: 1,
+  },
+  saveButton: {
+    backgroundColor: theme.primary,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  attachmentButton: {
+    borderRadius: 8,
+    padding: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
+    marginBottom: 10,
+  },
+  attachmentButtonText: {
+    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: '500',
+    color: theme.text,
+  },
+});
 
 export default AddTaskScreen; 

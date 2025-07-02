@@ -21,6 +21,7 @@ const TaskDetailScreen = () => {
   const route = useRoute();
   const { task: routeTask, taskId } = route.params;
   const { theme } = useTheme();
+  const styles = getStyles(theme);
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const [task, setTask] = useState(routeTask);
@@ -230,250 +231,212 @@ const TaskDetailScreen = () => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <StatusBar 
-        barStyle={theme.statusBarStyle} 
-        backgroundColor={theme.background}
-      />
+    <View style={styles.container}>
+      <StatusBar barStyle={theme.dark ? 'light-content' : 'dark-content'} />
       <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={{ paddingTop: insets.top + 10 }}
+        contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.header, { 
-          backgroundColor: theme.background,
-          borderBottomColor: theme.border 
-        }]}>
+        <View style={styles.header}>
           <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(task.category) }]}>
             <Text style={styles.priorityText}>{getPriorityText(task.category)}</Text>
           </View>
           
-          <View style={[
-            styles.timeRemaining, 
-            { backgroundColor: isOverdue() ? theme.danger + '20' : theme.primary + '20' }
-          ]}>
-            <Text style={[
-              styles.timeText, 
-              { color: isOverdue() ? theme.danger : theme.primary }
-            ]}>
+          <View style={[styles.timeRemainingBadge, { backgroundColor: isOverdue() ? theme.danger : theme.primary + '30' }]}>
+            <Text style={[styles.timeRemainingText, { color: isOverdue() ? '#fff' : theme.primary }]}>
               {getTimeRemaining()}
             </Text>
           </View>
         </View>
 
-                <View style={styles.content}>
-          <Text style={[styles.title, { color: theme.text }]}>{task.title}</Text>
+        <View style={styles.content}>
+          <Text style={styles.title}>{task.title}</Text>
           
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Açıklama</Text>
-            <Text style={[styles.description, { color: theme.textSecondary }]}>
-              {task.description || 'Açıklama eklenmemiş'}
-            </Text>
+            <Text style={styles.sectionTitle}>Açıklama</Text>
+            <Text style={styles.description}>{task.description || 'Açıklama yok'}</Text>
           </View>
 
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Son Tarih</Text>
-            <View style={styles.deadlineContainer}>
-              <Ionicons name="calendar-outline" size={20} color="#007AFF" />
-              <Text style={[styles.deadline, { color: theme.textSecondary }]}>
-                {formatDateTime(task.deadline)}
-              </Text>
+            <Text style={styles.sectionTitle}>Son Tarih</Text>
+            <View style={styles.deadlineInfo}>
+              <Ionicons name="calendar-outline" size={18} color={theme.textSecondary} />
+              <Text style={styles.deadlineText}>{formatDateTime(task.deadline)}</Text>
             </View>
           </View>
 
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Görev Bilgileri</Text>
-            <View style={styles.infoSection}>
+            <Text style={styles.sectionTitle}>Görev Bilgileri</Text>
+            <View style={styles.infoBox}>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Oluşturma Tarihi:</Text>
-                <Text style={styles.infoValue}>
-                  {task.createdAt ? new Date(task.createdAt).toLocaleDateString('tr-TR') : '01.07.2025'}
-                </Text>
+                <Text style={styles.infoValue}>{new Date(task.createdAt).toLocaleDateString('tr-TR')}</Text>
               </View>
               <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
                 <Text style={styles.infoLabel}>Durum:</Text>
-                <Text style={styles.infoValue}>Devam Ediyor</Text>
+                <Text style={[styles.infoValue, { color: task.completed ? theme.success : theme.warning, fontWeight: 'bold' }]}>
+                  {task.completed ? 'Tamamlandı' : 'Devam Ediyor'}
+                </Text>
               </View>
             </View>
           </View>
-
         </View>
       </ScrollView>
 
-      {!task.completed && (
-        <View style={[styles.footer, { backgroundColor: theme.background, borderTopColor: theme.border, paddingBottom: insets.top + 10 }]}>
-          <TouchableOpacity style={[styles.button, styles.editButton, {backgroundColor: theme.primary + '20'}]} onPress={() => navigation.navigate('EditTask', { task })}>
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+          <Ionicons name="trash-outline" size={20} color={theme.danger} />
+          <Text style={[styles.deleteButtonText]}>Görevi Sil</Text>
+        </TouchableOpacity>
+        <View style={styles.actionButtons}>
+          <TouchableOpacity style={[styles.actionButton, { backgroundColor: theme.primary + '30' }]} onPress={() => navigation.navigate('EditTask', { taskId: task.id })}>
             <Ionicons name="pencil-outline" size={20} color={theme.primary} />
-            <Text style={[styles.buttonText, { color: theme.primary }]}>Düzenle</Text>
+            <Text style={[styles.actionButtonText, { color: theme.primary }]}>Düzenle</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.button, styles.completeButton]} onPress={confirmComplete}>
-            <Ionicons name="checkmark-done-outline" size={20} color={'#fff'} />
-            <Text style={[styles.buttonText, { color: '#fff' }]}>Tamamla</Text>
-          </TouchableOpacity>
+          {!task.completed && (
+            <TouchableOpacity style={[styles.actionButton, { backgroundColor: theme.primary }]} onPress={confirmComplete}>
+              <Ionicons name="checkmark-done-outline" size={20} color={'#fff'} />
+              <Text style={[styles.actionButtonText, { color: '#fff' }]}>Tamamla</Text>
+            </TouchableOpacity>
+          )}
         </View>
-      )}
-
-      <TouchableOpacity
-        style={[styles.deleteButton, { bottom: (!task.completed ? 85 : 0) + insets.top + 10, backgroundColor: theme.danger + '20' }]}
-        onPress={handleDelete}
-      >
-        <Text style={[styles.deleteButtonText, { color: theme.danger }]}>Görevi Sil</Text>
-      </TouchableOpacity>
+      </View>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: theme.background,
   },
-  scrollView: {
-    flex: 1,
+  scrollContainer: {
+    flexGrow: 1,
+    paddingBottom: 120, // footer için boşluk
   },
   header: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
     borderBottomWidth: 1,
+    borderBottomColor: theme.border,
   },
   priorityBadge: {
-    paddingHorizontal: 12,
     paddingVertical: 6,
+    paddingHorizontal: 12,
     borderRadius: 20,
   },
   priorityText: {
-    color: '#fff',
-    fontSize: 12,
+    color: 'white',
     fontWeight: 'bold',
+    fontSize: 14,
   },
-  timeRemaining: {
-    paddingHorizontal: 12,
+  timeRemainingBadge: {
     paddingVertical: 6,
+    paddingHorizontal: 12,
     borderRadius: 20,
   },
-  timeText: {
-    fontSize: 12,
-    fontWeight: 'bold',
+  timeRemainingText: {
+    fontWeight: '600',
+    fontSize: 14,
   },
   content: {
     padding: 20,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 20,
+    color: theme.text,
   },
   section: {
-    marginBottom: 20,
+    marginBottom: 25,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 10,
+    color: theme.text,
   },
   description: {
     fontSize: 16,
     lineHeight: 24,
+    color: theme.textSecondary,
   },
-  deadlineContainer: {
+  deadlineInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
-  deadline: {
+  deadlineText: {
     fontSize: 16,
+    marginLeft: 8,
+    color: theme.textSecondary,
   },
-  infoSection: {
-    backgroundColor: '#f8f9fa',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 20,
+  infoBox: {
+    backgroundColor: theme.surface,
+    borderRadius: 12,
+    padding: 15,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: theme.border,
   },
   infoLabel: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 16,
+    color: theme.textSecondary,
   },
   infoValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#007AFF',
-  },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 30,
-    gap: 8,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  editButton: {},
-  actionButtonText: {
     fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  editButtonText: {
-    color: '#007AFF',
-  },
-  completeButton: {
-    backgroundColor: '#007AFF',
-  },
-  completeButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
+    fontWeight: '600',
+    color: theme.text,
   },
   footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    paddingHorizontal: 15,
-    paddingTop: 15,
+    padding: 20,
+    backgroundColor: theme.surface,
     borderTopWidth: 1,
+    borderTopColor: theme.border,
   },
-  button: {
-    flex: 1,
+  deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 15,
-    borderRadius: 12,
-    marginHorizontal: 5,
-  },
-  buttonText: {
-    marginLeft: 8,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  deleteButton: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
     padding: 15,
     borderRadius: 12,
-    alignItems: 'center',
+    backgroundColor: theme.danger + '20',
+    marginBottom: 10,
   },
   deleteButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: theme.danger,
+    marginLeft: 8,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 15,
+    borderRadius: 12,
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
 });
 
