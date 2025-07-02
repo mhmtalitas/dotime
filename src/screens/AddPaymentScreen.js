@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import CustomDateTimePicker from '../components/CustomDateTimePicker';
 import { usePayments } from '../context/PaymentContext';
+import NotificationService from '../services/NotificationService';
 
 const AddPaymentScreen = () => {
     const navigation = useNavigation();
@@ -73,6 +74,9 @@ const AddPaymentScreen = () => {
             };
 
             await addPayment(newPayment);
+            
+            // Yeni ödeme için bildirimleri kur (Doğrudan singleton instance'ı kullan)
+            await NotificationService.schedulePaymentReminders(newPayment);
 
             Alert.alert('Başarılı!', 'Ödemeniz başarıyla kaydedildi.', [
                 { text: 'Tamam', onPress: () => navigation.goBack() }

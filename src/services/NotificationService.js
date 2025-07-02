@@ -246,6 +246,84 @@ class NotificationService {
     }
   }
 
+  // Ödemeler için bildirimleri zamanla
+  async schedulePaymentReminders(payment) {
+    const paymentDate = new Date(payment.dueDate);
+    const now = new Date();
+    const scheduledNotifications = [];
+    let notificationSettings;
+
+    try {
+      const storedSettings = await AsyncStorage.getItem('notificationSettings');
+      // Ödemeler için farklı varsayılanlar kullanabiliriz, örn. daha uzun vadeli hatırlatmalar
+      notificationSettings = storedSettings ? JSON.parse(storedSettings) : {
+        enabled: true,
+        tenMinutes: false,
+        thirtyMinutes: false,
+        oneHour: true,
+        threeHours: false,
+        twentyFourHours: true, // Varsayılan olarak 1 gün önce
+      };
+    } catch (error) {
+      console.error('Bildirim ayarları okunurken hata, varsayılanlar kullanılıyor:', error);
+      notificationSettings = { enabled: true, oneHour: true, twentyFourHours: true };
+    }
+
+    if (!notificationSettings.enabled) {
+      console.log('Bildirimler kullanıcı tarafından kapatılmış, ödeme bildirimi kurulmayacak.');
+      return [];
+    }
+
+    const reminderTimes = [
+      { minutes: 60, label: '1 saat', setting: 'oneHour' },
+      { minutes: 180, label: '3 saat', setting: 'threeHours' },
+      { minutes: 1440, label: '24 saat', setting: 'twentyFourHours' },
+    ].filter(rt => notificationSettings[rt.setting]);
+
+
+    for (const reminder of reminderTimes) {
+      const reminderDate = new Date(paymentDate.getTime() - (reminder.minutes * 60 * 1000));
+      
+      if (reminderDate > now) {
+        const title = `💰 Yaklaşan Ödeme: ${payment.title}`;
+        const body = `Bu ödemenin son gününe yaklaşık ${reminder.label} kaldı.`;
+
+        const notificationId = await this.scheduleNotification(
+          title,
+          body,
+          reminderDate,
+          { type: 'payment_reminder', paymentId: payment.id }
+        );
+
+        if (notificationId) {
+          scheduledNotifications.push({ id: notificationId, label: reminder.label });
+        }
+      }
+    }
+    console.log(`✅ ${scheduledNotifications.length} ödeme bildirimi başarıyla zamanlandı.`);
+    return scheduledNotifications;
+  }
+
+  // Ödeme için tüm bildirimleri iptal et
+  async cancelPaymentNotifications(paymentId) {
+    try {
+      const allNotifications = await this.getAllScheduledNotifications();
+      const paymentNotifications = allNotifications.filter(
+        notification => notification.content.data.paymentId === paymentId
+      );
+      
+      for (const notification of paymentNotifications) {
+        await this.cancelNotification(notification.identifier);
+      }
+      
+      console.log(`💰 ${paymentNotifications.length} ödeme bildirimi iptal edildi (ID: ${paymentId})`);
+      return paymentNotifications.length;
+    } catch (error) {
+      console.error('Ödeme bildirimleri iptal edilirken hata:', error);
+      return 0;
+    }
+  }
+
   // Tüm zamanlanmış bildirimleri iptal et
   async cancelAllNotifications() {
     try {

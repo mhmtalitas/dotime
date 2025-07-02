@@ -7,6 +7,7 @@ import { useRoute, useNavigation, useIsFocused } from '@react-navigation/native'
 import { useTheme } from '../context/ThemeContext';
 import { usePayments } from '../context/PaymentContext';
 import { formatCurrency } from '../utils/formatCurrency';
+import NotificationService from '../services/NotificationService';
 
 const PaymentDetailScreen = () => {
   const route = useRoute();
@@ -66,6 +67,10 @@ const PaymentDetailScreen = () => {
   const markAsPaid = async () => {
     try {
       await updatePayment(payment.id, { isPaid: true, paidAt: new Date().getTime() });
+      
+      // Bildirimleri iptal et (Doğrudan singleton instance'ı kullan)
+      await NotificationService.cancelPaymentNotifications(payment.id);
+
       Alert.alert('Başarılı', 'Ödeme tamamlandı!', [
         { text: 'Tamam', onPress: () => navigation.goBack() },
       ]);
@@ -88,6 +93,10 @@ const PaymentDetailScreen = () => {
   const deletePaymentHandler = async () => {
     try {
       await deletePayment(payment.id);
+
+      // Bildirimleri iptal et (Doğrudan singleton instance'ı kullan)
+      await NotificationService.cancelPaymentNotifications(payment.id);
+
       Alert.alert('Başarılı', 'Ödeme silindi!', [
         { text: 'Tamam', onPress: () => navigation.goBack() },
       ]);

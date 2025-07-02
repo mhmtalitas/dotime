@@ -558,15 +558,12 @@ const SettingsScreen = ({ navigation }) => {
             }
           )}
         </View>
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: theme.primary }]}>DoTime v1.0.0</Text>
-          <Text style={[styles.footerSubtext, { color: theme.textSecondary }]}>
-            Mehmet Ali Taş Tarafından Geliştirilmiştir
-          </Text>
-        </View>
       </ScrollView>
+
+      {/* Footer - Uygulama Bilgileri */}
+      <View style={[styles.footer, { paddingBottom: insets.bottom || 20 }]}>
+        {/* Kaldırılan uygulama bilgileri */}
+      </View>
     </View>
   );
 };
@@ -663,17 +660,16 @@ const styles = StyleSheet.create({
   },
   footer: {
     alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
+    paddingVertical: 15,
   },
   footerText: {
     fontSize: 16,
-    fontWeight: '600',
     color: '#007AFF',
-    marginBottom: 4,
+    fontWeight: 'bold',
   },
-  footerSubtext: {
-    fontSize: 14,
+  subFooterText: {
+    marginTop: 5,
+    fontSize: 12,
     color: '#6C757D',
   },
 });
