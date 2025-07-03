@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, Pressable } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
@@ -210,7 +210,11 @@ const HomeScreen = () => {
         </TouchableOpacity>
       </View>
       <View style={styles.content}>
-        <TouchableOpacity style={{flex: 1}} onPress={handleTaskCardPress}>
+        <Pressable
+          style={{ flex: 1 }}
+          onPress={handleTaskCardPress}
+          android_ripple={{ color: 'rgba(255, 255, 255, 0.3)', borderless: false }}
+        >
           <LinearGradient
             colors={['#4a90e2', '#2a6cb5']}
             style={styles.card}
@@ -230,9 +234,13 @@ const HomeScreen = () => {
               )}
             </View>
           </LinearGradient>
-        </TouchableOpacity>
+        </Pressable>
 
-        <TouchableOpacity style={{flex: 1}} onPress={() => navigation.navigate('Payments')}>
+        <Pressable
+          style={{ flex: 1 }}
+          onPress={() => navigation.navigate('Payments')}
+          android_ripple={{ color: 'rgba(255, 255, 255, 0.3)', borderless: false }}
+        >
           <LinearGradient
             colors={['#50c9c3', '#33a59e']}
             style={styles.card}
@@ -249,7 +257,7 @@ const HomeScreen = () => {
               </Text>
             </View>
           </LinearGradient>
-        </TouchableOpacity>
+        </Pressable>
       </View>
       <Modal
         isVisible={isMenuVisible}
