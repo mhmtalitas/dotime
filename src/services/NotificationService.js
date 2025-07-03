@@ -253,40 +253,45 @@ class NotificationService {
     const scheduledNotifications = [];
     let notificationSettings;
 
+    // Önceki tüm bildirimleri iptal et, böylece düzenlemede çakışma olmaz.
+    await this.cancelPaymentNotifications(payment.id);
+    console.log(`🧹 Önceki bildirimler temizlendi (ID: ${payment.id})`);
+
     try {
       const storedSettings = await AsyncStorage.getItem('notificationSettings');
-      // Ödemeler için farklı varsayılanlar kullanabiliriz, örn. daha uzun vadeli hatırlatmalar
       notificationSettings = storedSettings ? JSON.parse(storedSettings) : {
         enabled: true,
-        tenMinutes: false,
-        thirtyMinutes: false,
+        tenMinutes: true, // Ödemeler için de kısa vadeli hatırlatıcılar ekleyelim
         oneHour: true,
-        threeHours: false,
-        twentyFourHours: true, // Varsayılan olarak 1 gün önce
+        twentyFourHours: true,
       };
     } catch (error) {
       console.error('Bildirim ayarları okunurken hata, varsayılanlar kullanılıyor:', error);
-      notificationSettings = { enabled: true, oneHour: true, twentyFourHours: true };
+      notificationSettings = { enabled: true, tenMinutes: true, oneHour: true, twentyFourHours: true };
     }
 
-    if (!notificationSettings.enabled) {
-      console.log('Bildirimler kullanıcı tarafından kapatılmış, ödeme bildirimi kurulmayacak.');
+    if (!notificationSettings.enabled || payment.isPaid) {
+      console.log('Bildirimler kapalı veya ödeme tamamlanmış. Bildirim kurulmayacak.');
       return [];
     }
+    
+    console.log('Kullanılan Ödeme Bildirim Ayarları:', notificationSettings);
 
     const reminderTimes = [
+      { minutes: 10, label: '10 dakika', setting: 'tenMinutes' },
       { minutes: 60, label: '1 saat', setting: 'oneHour' },
       { minutes: 180, label: '3 saat', setting: 'threeHours' },
       { minutes: 1440, label: '24 saat', setting: 'twentyFourHours' },
     ].filter(rt => notificationSettings[rt.setting]);
 
-
     for (const reminder of reminderTimes) {
       const reminderDate = new Date(paymentDate.getTime() - (reminder.minutes * 60 * 1000));
       
+      console.log(`[${reminder.label} için] Hesaplanan tetikleme: ${reminderDate.toLocaleString('tr-TR')}`);
+
       if (reminderDate > now) {
         const title = `💰 Yaklaşan Ödeme: ${payment.title}`;
-        const body = `Bu ödemenin son gününe yaklaşık ${reminder.label} kaldı.`;
+        const body = `Bu ödemenin son gününe yaklaşık ${reminder.label} kaldı. Tutar: ${payment.amount} TL`;
 
         const notificationId = await this.scheduleNotification(
           title,
@@ -298,9 +303,20 @@ class NotificationService {
         if (notificationId) {
           scheduledNotifications.push({ id: notificationId, label: reminder.label });
         }
+      } else {
+        console.log(`❌ [${reminder.label} için] Hatırlatma zamanı geçmişte. Atlanıyor.`);
       }
     }
-    console.log(`✅ ${scheduledNotifications.length} ödeme bildirimi başarıyla zamanlandı.`);
+
+    // Ek olarak, SON TESLİM ANINDA bir bildirim kur
+    if (paymentDate > now) {
+      const title = `❗ ÖDEME SON GÜNÜ: ${payment.title}`;
+      const body = `Bu ödemenin bugün son günü! Tutar: ${payment.amount} TL`;
+      await this.scheduleNotification(title, body, paymentDate, { type: 'payment_due', paymentId: payment.id });
+      console.log('⏰ Son teslim anı için bildirim kuruldu.');
+    }
+
+    console.log(`✅ ${scheduledNotifications.length} ödeme hatırlatıcısı başarıyla zamanlandı.`);
     return scheduledNotifications;
   }
 

@@ -5,6 +5,7 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import CustomDateTimePicker from '../components/CustomDateTimePicker';
 import { usePayments } from '../context/PaymentContext';
+import notificationService from '../services/NotificationService';
 
 const EditPaymentScreen = () => {
     const route = useRoute();
@@ -75,6 +76,11 @@ const EditPaymentScreen = () => {
             };
 
             await updatePayment(payment.id, updatedData);
+            
+            // Bildirimleri yeni tarihe göre yeniden kur.
+            // Servis içindeki mantık önce eskileri silip sonra yenileri kuracaktır.
+            const fullUpdatedPayment = { ...payment, ...updatedData };
+            await notificationService.schedulePaymentReminders(fullUpdatedPayment);
 
             Alert.alert('Başarılı!', 'Ödeme başarıyla güncellendi.', [
                 { text: 'Tamam', onPress: () => navigation.pop(2) } // Go back two screens

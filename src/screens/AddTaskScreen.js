@@ -166,7 +166,18 @@ const AddTaskScreen = () => {
       category,
       completed: false,
     };
+    
+    // Görevi veritabanına ekle
     await addTask(newTask);
+    
+    // Görev için bildirimleri kur
+    const taskWithId = {
+      ...newTask,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+    };
+    await notificationService.scheduleMultipleReminders(taskWithId);
+    
     Alert.alert('Başarılı', 'Yeni görev eklendi!', [
       { text: 'Tamam', onPress: () => navigation.goBack() }
     ]);

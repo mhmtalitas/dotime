@@ -23,16 +23,55 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const EditTaskScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { task: routeTask } = route.params;
+  const { task: routeTask, taskId } = route.params;
   const { theme } = useTheme();
   
-  const [title, setTitle] = useState(routeTask?.title || '');
-  const [description, setDescription] = useState(routeTask?.description || '');
-  const [category, setCategory] = useState(routeTask?.category || 'Work');
-  const [deadline, setDeadline] = useState(new Date(routeTask?.deadline || new Date()));
+  const [task, setTask] = useState(routeTask || null);
+  const [loading, setLoading] = useState(!routeTask);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('Work');
+  const [deadline, setDeadline] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [attachments, setAttachments] = useState(routeTask?.attachments || []);
+  const [attachments, setAttachments] = useState([]);
+
+  useEffect(() => {
+    const loadTask = async () => {
+      if (routeTask) {
+        // Eğer task objesi direkt geldiyse
+        setTask(routeTask);
+        setTitle(routeTask.title || '');
+        setDescription(routeTask.description || '');
+        setCategory(routeTask.category || 'Work');
+        setDeadline(new Date(routeTask.deadline || new Date()));
+        setAttachments(routeTask.attachments || []);
+        setLoading(false);
+      } else if (taskId) {
+        // Eğer sadece taskId geldiyse, görevi yükle
+        try {
+          const storedTasks = await AsyncStorage.getItem('tasks');
+          if (storedTasks) {
+            const parsedTasks = JSON.parse(storedTasks);
+            const foundTask = parsedTasks.find(t => t.id === taskId);
+            if (foundTask) {
+              setTask(foundTask);
+              setTitle(foundTask.title || '');
+              setDescription(foundTask.description || '');
+              setCategory(foundTask.category || 'Work');
+              setDeadline(new Date(foundTask.deadline || new Date()));
+              setAttachments(foundTask.attachments || []);
+            }
+          }
+        } catch (error) {
+          console.error('Görev yüklenirken hata:', error);
+        }
+        setLoading(false);
+      }
+    };
+
+    loadTask();
+  }, [routeTask, taskId]);
 
   const taskCategories = [
     { key: 'Urgent', label: 'Acil', icon: 'flame-outline', color: '#FF3B30' },
@@ -159,7 +198,7 @@ const EditTaskScreen = () => {
 
     try {
       const updatedTask = {
-        ...routeTask,
+        ...task,
         title,
         description,
         category,
@@ -172,7 +211,7 @@ const EditTaskScreen = () => {
       
       // Eski bildirimleri iptal et ve yeni bildirimler zamanla
       try {
-        await notificationService.cancelTaskNotifications(routeTask.id);
+        await notificationService.cancelTaskNotifications(task.id);
         await notificationService.requestPermissions();
         const scheduledNotifications = await notificationService.scheduleMultipleReminders(updatedTask);
         console.log(`${scheduledNotifications.length} yeni bildirim zamanlandı`);
@@ -350,8 +389,26 @@ const EditTaskScreen = () => {
     },
   });
 
-  if (!routeTask) {
-    return <View><Text>Görev yükleniyor...</Text></View>
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: theme.text, fontSize: 16 }}>Görev yükleniyor...</Text>
+      </View>
+    );
+  }
+
+  if (!task) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: theme.text, fontSize: 16 }}>Görev bulunamadı</Text>
+        <TouchableOpacity 
+          style={{ marginTop: 20, padding: 10, backgroundColor: theme.primary, borderRadius: 8 }}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={{ color: 'white' }}>Geri Dön</Text>
+        </TouchableOpacity>
+      </View>
+    );
   }
 
   return (

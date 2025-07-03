@@ -132,10 +132,16 @@ function AppNavigator() {
         component={TasksScreen} 
         options={{ title: 'Görevler' }} 
       />
-      <Stack.Screen 
-        name="Payments" 
-        component={PaymentsScreen} 
-        options={{ title: 'Ödemeler' }} 
+      <Stack.Screen
+        name="Payments"
+        component={PaymentsScreen}
+        options={{
+          title: 'Ödemeler',
+          headerStyle: {
+            backgroundColor: '#007bff',
+          },
+          headerTintColor: '#fff',
+        }}
       />
       <Stack.Screen 
         name="AddTask" 
